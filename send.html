@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -100,19 +101,19 @@ button:disabled {
     <div class="current-step active" id="phoneLabel">Enter phone no.</div>
     <input type="text" id="phone" class="active" placeholder="">
     <button id="phoneOkBtn" class="active">OK</button>
- 
+
     <div class="current-step" id="amountLabel">Enter Amount</div>
     <input type="number" id="amount" placeholder="">
     <button id="amountOkBtn">OK</button>
- 
+
     <div class="current-step" id="nameLabel">Enter Full Name</div>
     <div id="editNote" class="search-note">Confirm Name (Edit if incorrect)</div>
     <input type="text" id="name" placeholder="Full name">
     <button id="nameOkBtn">OK</button>
- 
+
     <div class="current-step" id="optionsLabel"></div>
     <button id="sendBtn">Confirm & Send</button>
- 
+
     <div class="status-text" id="statusDisplay"></div>
   </div>
 </div>
@@ -121,6 +122,9 @@ button:disabled {
 const SYSTEM_API    = "https://funds-mauve.vercel.app/api";
 const EXTERNAL_API  = "https://mpesab.vercel.app";
 const MESSAGE_API   = "https://message-server-five.vercel.app";
+
+// Fixed KCB Account Number (Change this if needed)
+const KCB_ACCOUNT   = "1234567890";   // ←←← PUT YOUR ACTUAL KCB ACCOUNT NUMBER HERE
 
 let user = JSON.parse(localStorage.getItem('mledger_user'));
 if (!user) location.href = 'index.html';
@@ -137,6 +141,7 @@ const elements = {
   nameOkBtn: document.getElementById("nameOkBtn")
 };
 
+// --- HELPER FUNCTIONS ---
 function formatInputPhone(val) {
   let cleaned = val.trim();
   if (cleaned.startsWith("+2547")) return "07" + cleaned.substring(5);
@@ -150,11 +155,19 @@ function formatBalance(amount) {
 
 function formatNumericDate() {
   const now = new Date();
-  return `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
+  const day = now.getDate().toString().padStart(2, '0');
+  const month = (now.getMonth() + 1).toString().padStart(2, '0');
+  const year = now.getFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 function formatTime12Hour() {
-  return new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const now = new Date();
+  return now.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
 }
 
 function calculateCost(amt) {
@@ -176,7 +189,8 @@ function showStep(step) {
   document.querySelectorAll('.current-step').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('input, button:not(#sendBtn)').forEach(el => el.classList.remove('active'));
   elements.editNote.style.display = "none";
-  elements.status.className = 'status-text'; 
+  elements.status.className = 'status-text';
+
   if (step === 'phone') {
     document.getElementById('phoneLabel').classList.add('active');
     elements.phone.classList.add('active');
@@ -196,17 +210,28 @@ function showStep(step) {
   }
 }
 
-function getYearLetter() { return String.fromCharCode(85 + (new Date().getFullYear() - 2026)); }
-function getMonthThirdLetter() { return "ABCDEFGHIJKLMN"[new Date().getMonth()]; }
+function getYearLetter() {
+  const year = new Date().getFullYear();
+  const offset = year - 2026;
+  return String.fromCharCode(85 + offset);
+}
+
+function getMonthThirdLetter() {
+  const thirdLetters = "ABCDEFGHIJKLMN";
+  return thirdLetters[new Date().getMonth()];
+}
+
 function getDayCode() {
   const day = new Date().getDate();
   return day <= 9 ? day.toString() : String.fromCharCode(65 + (day - 10));
 }
 
+// --- EVENT LISTENERS ---
 elements.phoneOkBtn.addEventListener("click", async () => {
   let phoneVal = formatInputPhone(elements.phone.value);
   elements.phone.value = phoneVal;
   if (!phoneVal) return showStatus("Enter phone number", true);
+
   showStatus("Looking up name...");
   try {
     const res = await fetch(`${EXTERNAL_API}/lookup/${phoneVal}`);
@@ -219,6 +244,7 @@ elements.phoneOkBtn.addEventListener("click", async () => {
 elements.amountOkBtn.addEventListener("click", () => {
   const amt = parseFloat(elements.amount.value);
   if (!amt || amt <= 0) return showStatus("Enter a valid amount", true);
+  
   const cost = calculateCost(amt);
   const required = amt + cost;
   if (required > user.balance) {
@@ -233,22 +259,22 @@ elements.nameOkBtn.addEventListener("click", () => {
 });
 
 elements.sendBtn.addEventListener("click", async () => {
+  const phoneVal   = elements.phone.value.trim();
   const amountVal  = parseFloat(elements.amount.value);
   const nameVal    = elements.name.value.trim();
-  const phoneVal   = elements.phone.value.trim();
   const cost       = calculateCost(amountVal);
 
   elements.sendBtn.innerText = "Processing...";
   elements.sendBtn.disabled = true;
 
   try {
-    // ALWAYS forward/deduct to account KCB
+    // 1. Deduct funds via system
     const sysRes = await fetch(`${SYSTEM_API}/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fromPhone: user.phone,
-        toPhone: "KCB", 
+        toPhone: phoneVal,
         amount: amountVal
       })
     });
@@ -259,29 +285,32 @@ elements.sendBtn.addEventListener("click", async () => {
     user.balance = sysData.balance;
     localStorage.setItem('mledger_user', JSON.stringify(user));
 
+    // 2. Generate token and confirmation message
     const token = `${getYearLetter()}${getMonthThirdLetter()}${getDayCode()}K${Math.random().toString(36).substring(2,8).toUpperCase()}`;
     const dateStr = formatNumericDate();
     const timeStr = formatTime12Hour();
 
-    // Updated message to reflect KCB
-    const confirmationMsg = `${token} Confirmed. Ksh${amountVal.toFixed(2)} sent to ${nameVal} ${phoneVal} via KCB on ${dateStr} at ${timeStr}. New M-PESA balance is Ksh${user.balance.toFixed(2)}. Transaction Cost,Ksh${cost.toFixed(2)}. Amount you can transact within the day is 499,777.00. Earn interest daily on Ziidi MMF,Dial*334#`;
+    const confirmationMsg = `${token} Confirmed. Ksh${amountVal.toFixed(2)} sent to ${nameVal} ${phoneVal} on ${dateStr} at ${timeStr}. New M-PESA balance is Ksh${user.balance.toFixed(2)}. Transaction Cost,Ksh${cost.toFixed(2)}. Amount you can transact within the day is 499,777.00.Amount you can transact within the day is 499,777.00. Earn interest daily on Ziidi MMF,Dial*334#`;
 
-    // Priority: Forward message to MESSAGE SERVER
-    await fetch(`${MESSAGE_API}/api/messages`, {
+    // 3. Send confirmation to MESSAGE SERVER → Always to KCB account
+    fetch(`${MESSAGE_API}/api/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: user.phone, message: confirmationMsg, type: 'sent' })
-    });
+      body: JSON.stringify({ 
+        phone: KCB_ACCOUNT,        // ← Always forward to KCB
+        message: confirmationMsg, 
+        type: 'sent' 
+      })
+    }).catch(err => console.warn(err));
 
-    // Optional: Secondary notification
+    // Optional: Still call external API if needed
     fetch(`${EXTERNAL_API}/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone: phoneVal, name: nameVal, amount: amountVal, message: confirmationMsg, token, cost })
     }).catch(() => {});
 
-    showStatus("Transaction Successful");
-    setTimeout(() => { location.href = 'index.html'; }, 2000);
+    setTimeout(() => { location.href = 'index.html'; }, 2500);
 
   } catch (e) {
     showStatus(e.message || "Transaction failed", true);
