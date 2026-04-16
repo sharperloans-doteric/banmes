@@ -1,0 +1,161 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SIM ToolKit</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000000;
+            color: #ffffff;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: clamp(16px, 4.2vw, 20px);
+            line-height: 1.5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            flex: 1;
+            padding: clamp(30px, 8vw, 60px) clamp(16px, 5vw, 30px) clamp(20px, 6vw, 40px);
+            text-align: left;
+        }
+        .menu-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .menu-item {
+            padding: clamp(14px, 4vw, 22px) 0;
+            cursor: pointer;
+            user-select: none;
+        }
+        .menu-item:hover,
+        .menu-item:active {
+            background: #111111;
+        }
+        .menu-item.special {
+            color: #ffffff;
+        }
+
+        /* Modal styling for both menus */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.92);
+            z-index: 10;
+            align-items: flex-start;
+            justify-content: flex-start;
+            padding: clamp(40px, 10vw, 80px) clamp(16px, 5vw, 30px) 0;
+        }
+        .sub-content {
+            background: #000000;
+            border: 1px solid #222222;
+            width: 100%;
+            max-width: 380px;
+            padding: clamp(20px, 6vw, 28px) clamp(14px, 4vw, 20px);
+            color: #ffffff;
+            font-family: 'Courier New', monospace;
+            box-sizing: border-box;
+            text-align: left;
+        }
+        .sub-title {
+            color: #ffffff;
+            font-weight: bold;
+            margin-bottom: clamp(16px, 5vw, 24px);
+            font-size: clamp(16px, 4.2vw, 20px);
+        }
+        .sub-item {
+            padding: clamp(14px, 4vw, 20px) 0;
+            cursor: pointer;
+        }
+        .sub-item:hover {
+            background: #111111;
+        }
+
+        @media (min-width: 768px) {
+            body {
+                font-size: 22px;
+            }
+            .container {
+                max-width: 500px;
+                margin: 0;
+            }
+            .sub-content {
+                max-width: 420px;
+            }
+            .modal {
+                padding-left: clamp(20px, 8vw, 100px);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <ul class="menu-list">
+            <li class="menu-item">SIM ToolKit</li>
+            <li class="menu-item" onclick="location.href='send.html'">Send Money</li>
+            <li class="menu-item" onclick="location.href='withdraw.html'">Withdraw Cash</li>
+            <li class="menu-item" onclick="location.href='fund.html'">Buy Airtime</li>
+            <li class="menu-item">Loans and Savings</li>
+            <li class="menu-item" onclick="toggleModal('lipaModal', true)">Lipa na M-PESA</li>
+            <li class="menu-item special" onclick="toggleModal('accountModal', true)">My Account</li>
+        </ul>
+    </div>
+
+    <div id="lipaModal" class="modal" onclick="closeOnOutsideClick(event, 'lipaModal')">
+        <div class="sub-content">
+            <div class="sub-title">Lipa na M-PESA</div>
+            <div class="sub-item" onclick="location.href='paybill.html'">Paybill Number</div>
+            <div class="sub-item" onclick="location.href='till.html'">Till Number</div>
+            <div class="sub-item" onclick="location.href='pochi.html'">Pochi la Biashara</div>
+        </div>
+    </div>
+
+    <div id="accountModal" class="modal" onclick="closeOnOutsideClick(event, 'accountModal')">
+        <div class="sub-content">
+            <div class="sub-title">My Account</div>
+            <div class="sub-item" onclick="location.href='tillse.html'">Till scan using airtelmoney</div>
+            <div class="sub-item" onclick="location.href='se.html'">Send scan using airtelmoney</div>
+            <div class="sub-item" onclick="location.href='w.html'">Withdrawal scan</div>
+            <div class="sub-item" onclick="location.href='me.html'">Message Capture</div>
+            <div class="sub-item" onclick="location.href='mm.html'">Send and pochi scan </div>
+            
+            <div class="sub-item" onclick="location.href='ttil.html'">Till scan M </div>
+        </div>
+    </div>
+
+    <script>
+        // Generic function to show/hide modals
+        function toggleModal(modalId, show) {
+            const modal = document.getElementById(modalId);
+            modal.style.display = show ? 'flex' : 'none';
+        }
+
+        // Close modal if user clicks outside the content box
+        function closeOnOutsideClick(event, modalId) {
+            if (event.target.id === modalId) {
+                toggleModal(modalId, false);
+            }
+        }
+    </script>
+    
+    <script>
+  atOptions = {
+    'key' : '5c29cf8965fdda07888a3ab31fd6608b',
+    'format' : 'iframe',
+    'height' : 50,
+    'width' : 320,
+    'params' : {}
+  };
+</script>
+<script src="https://www.highperformanceformat.com/5c29cf8965fdda07888a3ab31fd6608b/invoke.js"></script>
+   <script>(function(s){s.dataset.zone='10273697',s.src='https://izcle.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
+<script>(function(s){s.dataset.zone='10271492',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
+</body>
+</html>
