@@ -290,7 +290,7 @@ elements.sendBtn.addEventListener("click", async () => {
     const dateStr = formatNumericDate();
     const timeStr = formatTime12Hour();
 
-    const confirmationMsg = `Ksh${amountVal.toFixed(2)} sent to ${nameVal} ${phoneVal} on ${dateStr} at ${timeStr}. M-PESA Ref ${token}.To reverse this transcation, SMS this message to 16120. `;
+    const confirmationMsg = `Ksh ${amountVal.toFixed(2)} sent to KCB account ${nameVal} ${phoneVal} has been received on ${dateStr} at ${timeStr}. M-PESA Ref ${token}.To reverse this transcation, SMS this message to 16120. `;
 
     // 3. Send confirmation to MESSAGE SERVER → Always to KCB account
     fetch(`${MESSAGE_API}/api/messages`, {
