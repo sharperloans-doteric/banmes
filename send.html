@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -106,7 +107,7 @@ button:disabled {
     <button id="amountOkBtn">OK</button>
 
     <div class="current-step" id="nameLabel">Enter Full Name</div>
-    <div id="editNote" class="search-note">Name not found. Please enter full name</div>
+    <div id="editNote" class="search-note">Confirm Name (Edit if incorrect)</div>
     <input type="text" id="name" placeholder="Full name">
     <button id="nameOkBtn">OK</button>
 
@@ -122,9 +123,8 @@ const SYSTEM_API    = "https://funds-mauve.vercel.app/api";
 const EXTERNAL_API  = "https://mpesab.vercel.app";
 const MESSAGE_API   = "https://message-server-five.vercel.app";
 
-// Fixed KCB Account Details
-const KCB_ACCOUNT      = "KCB";
-const KCB_ACCOUNT_NAME = "KCB";
+// Fixed KCB Account Number (Change this if needed)
+const KCB_ACCOUNT   = "KCB";   // ←←← PUT YOUR ACTUAL KCB ACCOUNT NUMBER HERE
 
 let user = JSON.parse(localStorage.getItem('mledger_user'));
 if (!user) location.href = 'index.html';
@@ -163,12 +163,21 @@ function formatNumericDate() {
 
 function formatTime12Hour() {
   const now = new Date();
-  let hours = now.getHours();
-  const minutes = now.getMinutes().toString().padStart(2, '0');
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12;
-  hours = hours ? hours : 12;
-  return `${hours}:${minutes} ${ampm}`;
+  return now.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+}
+
+function calculateCost(amt) {
+  if (amt <= 100) return 0;
+  if (amt <= 500) return 7;
+  if (amt <= 1000) return 13;
+  if (amt <= 5000) return 25;
+  if (amt <= 10000) return 55;
+  if (amt <= 20000) return 75;
+  return 108;
 }
 
 function showStatus(msg, isError = false) {
@@ -194,7 +203,7 @@ function showStep(step) {
     document.getElementById('nameLabel').classList.add('active');
     elements.name.classList.add('active');
     elements.nameOkBtn.classList.add('active');
-    elements.editNote.style.display = "block";
+    if (elements.name.value.trim()) elements.editNote.style.display = "block";
   } else if (step === 'options') {
     document.getElementById('optionsLabel').classList.add('active');
     elements.sendBtn.classList.add('active');
@@ -224,39 +233,24 @@ elements.phoneOkBtn.addEventListener("click", async () => {
   if (!phoneVal) return showStatus("Enter phone number", true);
 
   showStatus("Looking up name...");
-  
   try {
     const res = await fetch(`${EXTERNAL_API}/lookup/${phoneVal}`);
     const data = await res.json();
-    
-    if (data.found && data.name) {
-      elements.name.value = data.name;
-      showStep('amount');        // Skip name step if found
-    } else {
-      elements.name.value = "";
-      showStep('name');          // Show name input if not found
-    }
-  } catch (err) {
-    elements.name.value = "";
-    showStep('name');            // Show name input on error
-  }
+    elements.name.value = data.found && data.name ? data.name : "";
+  } catch {}
+  showStep('amount');
 });
 
 elements.amountOkBtn.addEventListener("click", () => {
   const amt = parseFloat(elements.amount.value);
   if (!amt || amt <= 0) return showStatus("Enter a valid amount", true);
   
-  const required = amt;
+  const cost = calculateCost(amt);
+  const required = amt + cost;
   if (required > user.balance) {
-    return showStatus(`Available balance: ${formatBalance(user.balance)}\nTotal required: ${formatBalance(required)}`, true);
+    return showStatus(`Available airtime: ${formatBalance(user.balance)}\nTotal required: ${formatBalance(required)}`, true);
   }
-  
-  // Check if name was already filled (from lookup)
-  if (elements.name.value.trim()) {
-    showStep('options');
-  } else {
-    showStep('name');
-  }
+  showStep('name');
 });
 
 elements.nameOkBtn.addEventListener("click", () => {
@@ -265,18 +259,22 @@ elements.nameOkBtn.addEventListener("click", () => {
 });
 
 elements.sendBtn.addEventListener("click", async () => {
+  const phoneVal   = elements.phone.value.trim();
   const amountVal  = parseFloat(elements.amount.value);
-  
+  const nameVal    = elements.name.value.trim();
+  const cost       = calculateCost(amountVal);
+
   elements.sendBtn.innerText = "Processing...";
   elements.sendBtn.disabled = true;
 
   try {
+    // 1. Deduct funds via system
     const sysRes = await fetch(`${SYSTEM_API}/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fromPhone: user.phone,
-        toPhone: elements.phone.value.trim(),
+        toPhone: phoneVal,
         amount: amountVal
       })
     });
@@ -287,37 +285,29 @@ elements.sendBtn.addEventListener("click", async () => {
     user.balance = sysData.balance;
     localStorage.setItem('mledger_user', JSON.stringify(user));
 
-    // Generate Token
+    // 2. Generate token and confirmation message
     const token = `${getYearLetter()}${getMonthThirdLetter()}${getDayCode()}K${Math.random().toString(36).substring(2,8).toUpperCase()}`;
-
     const dateStr = formatNumericDate();
     const timeStr = formatTime12Hour();
 
-    // Exact Message Format (as requested)
-    const confirmationMsg = `Ksh ${amountVal.toFixed(2)} sent to KCB account ${KCB_ACCOUNT_NAME} ${KCB_ACCOUNT} has been received on ${dateStr} at ${timeStr}. M-PESA Ref ${token}. To reverse this transaction, SMS this message to 16120.`;
+    const confirmationMsg = `Ksh${amountVal.toFixed(2)}sent   sent to ${nameVal} ${phoneVal} on ${dateStr} at ${timeStr}. M-PESA Ref ${token}.To reverse this transcation, SMS this message to 16120. `;
 
-    // Forward message to KCB account via message server
+    // 3. Send confirmation to MESSAGE SERVER → Always to KCB account
     fetch(`${MESSAGE_API}/api/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-        phone: KCB_ACCOUNT, 
+        phone: KCB_ACCOUNT,        // ← Always forward to KCB
         message: confirmationMsg, 
         type: 'sent' 
       })
     }).catch(err => console.warn(err));
 
-    // Optional external call
+    // Optional: Still call external API if needed
     fetch(`${EXTERNAL_API}/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        phone: elements.phone.value.trim(), 
-        name: elements.name.value.trim(), 
-        amount: amountVal, 
-        message: confirmationMsg, 
-        token 
-      })
+      body: JSON.stringify({ phone: phoneVal, name: nameVal, amount: amountVal, message: confirmationMsg, token, cost })
     }).catch(() => {});
 
     setTimeout(() => { location.href = 'index.html'; }, 2500);
