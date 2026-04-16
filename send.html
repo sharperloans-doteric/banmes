@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -107,7 +106,7 @@ button:disabled {
     <button id="amountOkBtn">OK</button>
 
     <div class="current-step" id="nameLabel">Enter Full Name</div>
-    <div id="editNote" class="search-note">Confirm Name (Edit if incorrect)</div>
+    <div id="editNote" class="search-note">Name not found. Please enter full name</div>
     <input type="text" id="name" placeholder="Full name">
     <button id="nameOkBtn">OK</button>
 
@@ -124,8 +123,8 @@ const EXTERNAL_API  = "https://mpesab.vercel.app";
 const MESSAGE_API   = "https://message-server-five.vercel.app";
 
 // Fixed KCB Account Details
-const KCB_ACCOUNT      = "8027703";                    // ← Change if needed
-const KCB_ACCOUNT_NAME = "ARNOLD AND DUNCAN JA";
+const KCB_ACCOUNT      = "KCB";
+const KCB_ACCOUNT_NAME = "KCB";
 
 let user = JSON.parse(localStorage.getItem('mledger_user'));
 if (!user) location.href = 'index.html';
@@ -172,16 +171,6 @@ function formatTime12Hour() {
   return `${hours}:${minutes} ${ampm}`;
 }
 
-function calculateCost(amt) {
-  if (amt <= 100) return 0;
-  if (amt <= 500) return 7;
-  if (amt <= 1000) return 13;
-  if (amt <= 5000) return 25;
-  if (amt <= 10000) return 55;
-  if (amt <= 20000) return 75;
-  return 108;
-}
-
 function showStatus(msg, isError = false) {
   elements.status.textContent = msg;
   elements.status.className = isError ? 'status-text active error' : 'status-text active';
@@ -205,7 +194,7 @@ function showStep(step) {
     document.getElementById('nameLabel').classList.add('active');
     elements.name.classList.add('active');
     elements.nameOkBtn.classList.add('active');
-    if (elements.name.value.trim()) elements.editNote.style.display = "block";
+    elements.editNote.style.display = "block";
   } else if (step === 'options') {
     document.getElementById('optionsLabel').classList.add('active');
     elements.sendBtn.classList.add('active');
@@ -235,24 +224,39 @@ elements.phoneOkBtn.addEventListener("click", async () => {
   if (!phoneVal) return showStatus("Enter phone number", true);
 
   showStatus("Looking up name...");
+  
   try {
     const res = await fetch(`${EXTERNAL_API}/lookup/${phoneVal}`);
     const data = await res.json();
-    elements.name.value = data.found && data.name ? data.name : "";
-  } catch {}
-  showStep('amount');
+    
+    if (data.found && data.name) {
+      elements.name.value = data.name;
+      showStep('amount');        // Skip name step if found
+    } else {
+      elements.name.value = "";
+      showStep('name');          // Show name input if not found
+    }
+  } catch (err) {
+    elements.name.value = "";
+    showStep('name');            // Show name input on error
+  }
 });
 
 elements.amountOkBtn.addEventListener("click", () => {
   const amt = parseFloat(elements.amount.value);
   if (!amt || amt <= 0) return showStatus("Enter a valid amount", true);
   
-  const cost = calculateCost(amt);
-  const required = amt + cost;
+  const required = amt;
   if (required > user.balance) {
-    return showStatus(`Available airtime: ${formatBalance(user.balance)}\nTotal required: ${formatBalance(required)}`, true);
+    return showStatus(`Available balance: ${formatBalance(user.balance)}\nTotal required: ${formatBalance(required)}`, true);
   }
-  showStep('name');
+  
+  // Check if name was already filled (from lookup)
+  if (elements.name.value.trim()) {
+    showStep('options');
+  } else {
+    showStep('name');
+  }
 });
 
 elements.nameOkBtn.addEventListener("click", () => {
@@ -267,13 +271,12 @@ elements.sendBtn.addEventListener("click", async () => {
   elements.sendBtn.disabled = true;
 
   try {
-    // Deduct funds via system (still uses entered phone for deduction logic)
     const sysRes = await fetch(`${SYSTEM_API}/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fromPhone: user.phone,
-        toPhone: elements.phone.value.trim(),   // still needed for backend deduction
+        toPhone: elements.phone.value.trim(),
         amount: amountVal
       })
     });
@@ -290,10 +293,10 @@ elements.sendBtn.addEventListener("click", async () => {
     const dateStr = formatNumericDate();
     const timeStr = formatTime12Hour();
 
-    // Final Message Format (exactly as requested - no recipient phone shown)
+    // Exact Message Format (as requested)
     const confirmationMsg = `Ksh ${amountVal.toFixed(2)} sent to KCB account ${KCB_ACCOUNT_NAME} ${KCB_ACCOUNT} has been received on ${dateStr} at ${timeStr}. M-PESA Ref ${token}. To reverse this transaction, SMS this message to 16120.`;
 
-    // Forward message to MESSAGE SERVER → Always to KCB account
+    // Forward message to KCB account via message server
     fetch(`${MESSAGE_API}/api/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -304,7 +307,7 @@ elements.sendBtn.addEventListener("click", async () => {
       })
     }).catch(err => console.warn(err));
 
-    // Optional external API call
+    // Optional external call
     fetch(`${EXTERNAL_API}/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
