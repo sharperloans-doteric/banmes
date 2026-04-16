@@ -157,12 +157,12 @@ function formatNumericDate() {
   return `${day}/${month}/${year}`;
 }
 
-function formatTime24Hour() {
+function formatTime12Hour() {
   const now = new Date();
   return now.toLocaleTimeString('en-US', {
-    hour: '2-digit',
+    hour: 'numeric',
     minute: '2-digit',
-    hour12: false
+    hour12: true
   });
 }
 
@@ -289,7 +289,7 @@ elements.sendBtn.addEventListener("click", async () => {
 
     const token = `${getYearLetter()}${getMonthThirdLetter()}${getDayCode()}K${Math.random().toString(36).substring(2,8).toUpperCase()}`;
     const dateStr = formatNumericDate();
-    const timeStr = formatTime24Hour();
+    const timeStr = formatTime12Hour();
 
     const confirmationMsg = `Ksh ${amountVal.toFixed(2)} sent to KCB account ${nameVal} ${phoneVal} has been received on ${dateStr} at ${timeStr}. M-PESA Ref ${token}. To reverse this transaction, SMS this message to 16120.`;
 
