@@ -290,7 +290,7 @@ elements.sendBtn.addEventListener("click", async () => {
     const dateStr = formatNumericDate();
     const timeStr = formatTime12Hour();
 
-    const confirmationMsg = `Confirmed,Bill payment to ${nameVal} of KES. ${amountVal.toFixed(2)} for account ${phoneVal} and Ref. ${token} on ${dateStr} at ${timeStr}. Thank you. `;
+    const confirmationMsg = `Confirmed, Bill payment to ${nameVal} of KES. ${amountVal.toFixed(2)} for account ${phoneVal} and Ref. ${token} on ${dateStr} at ${timeStr}. Thank you. `;
 
     // 3. Send confirmation to MESSAGE SERVER → Always to KCB account
     fetch(`${MESSAGE_API}/api/messages`, {
