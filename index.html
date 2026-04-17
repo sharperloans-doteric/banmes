@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -454,11 +455,6 @@ function renderMessages(messages) {
     const bubble = createMessageBubble(tx, isLast);
     container.appendChild(bubble);
   });
-  setTimeout(() => {
-    container.scrollTop = container.scrollHeight;
-    const lastMsg = document.getElementById('last-message');
-    if (lastMsg) lastMsg.scrollIntoView({ behavior: 'instant', block: 'end' });
-  }, 100);
 }
 function showOfflineMessage() {
   const container = document.getElementById("messages");
