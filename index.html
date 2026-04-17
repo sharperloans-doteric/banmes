@@ -161,6 +161,7 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 10px;
+  padding-bottom: 70px;
   display: flex;
   flex-direction: column;
 }
@@ -535,17 +536,6 @@ async function loadMessagesByPhone(phone) {
       const data = JSON.parse(cached);
       container.style.opacity = "1";
       renderMessages(data);
-      const notice = document.createElement("div");
-      notice.style.padding = "10px 14px";
-      notice.style.background = "#422c00";
-      notice.style.color = "#ffcc80";
-      notice.style.fontSize = "13px";
-      notice.style.textAlign = "center";
-      notice.style.borderRadius = "12px";
-      notice.style.margin = "8px auto";
-      notice.style.maxWidth = "90%";
-      notice.textContent = "Showing cached messages";
-      container.prepend(notice);
     } else {
       container.style.opacity = "1";
       renderMessages([]);
